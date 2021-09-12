@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import Post from "./components/Post";
-import { db, auth, storage } from "./firebase";
+import { db, auth } from "./firebase";
 import { makeStyles } from "@material-ui/core/styles";
 import Modal from "@material-ui/core/Modal";
 import { Button, Input } from "@material-ui/core";
+import ImageUpload from "./components/ImageUpload";
+import InstagramEmbed from "react-instagram-embed";
 
 function getModalStyle() {
   const top = 50;
@@ -46,45 +48,28 @@ function App() {
         //user has logged in....
         console.log(authUser);
         setUser(authUser);
-
-        // if (authUser.displayName) {
-        //   //don't update user name
-        // } else {
-        //   // if we just created someone
-        //   return authUser.updateProfile({
-        //     displayName: username,
-        //   });
-        // }
       } else {
         // user has looged out
-        setUser(null);
+        setUser(false);
       }
     });
 
-    return () => {
-      // prefrom some cleanup actions
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [user, username]);
-
-  //   {
-  //     username: "Groot",
-  //     caption: "I am Groot",
-  //     imageUrl:
-  //       "https://wallpaperbat.com/img/328475-wallpaper-amoled-iphone-groot-marvel-wallpaper-hd-superhero.jpg",
-  //   },
 
   //useEffect - run a peice of code based on a specfic condition
   useEffect(() => {
-    db.collection("posts").onSnapshot((snapshot) => {
-      // every time a new post added this code will run
-      setPosts(
-        snapshot.docs.map((doc) => ({
-          id: doc.id,
-          post: doc.data(),
-        }))
-      );
-    });
+    db.collection("posts")
+      .orderBy("timestamp", "desc")
+      .onSnapshot((snapshot) => {
+        // every time a new post added this code will run
+        setPosts(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            post: doc.data(),
+          }))
+        );
+      });
   }, []);
 
   const signUp = (event) => {
@@ -93,11 +78,13 @@ function App() {
     auth
       .createUserWithEmailAndPassword(email, password)
       .then((authUser) => {
-        authUser.user.updateProfile({
+        return authUser.user.updateProfile({
           displayName: username,
         });
       })
       .catch((error) => alert(error.messaage));
+
+    //console.log(username);
 
     setOpen(false);
   };
@@ -185,28 +172,53 @@ function App() {
           src="https://www.instagram.com/static/images/web/mobile_nav_type_logo.png/735145cfe0a4.png"
           alt=""
         />
+        {user ? (
+          <Button onClick={() => auth.signOut()}>Logout</Button>
+        ) : (
+          <div className="app_loginContainer">
+            <Button onClick={() => setOpenSignIn(true)}>Sign In</Button>
+            <Button onClick={() => setOpen(true)}>Sign Up</Button>
+          </div>
+        )}
       </div>
-      {user ? (
-        <Button onClick={() => auth.signOut()}>Logout</Button>
-      ) : (
-        <div className="app_loginContainer">
-          <Button onClick={() => setOpenSignIn(true)}>Sign In</Button>
-          <Button onClick={() => setOpen(true)}>Sign Up</Button>
-        </div>
-      )}
 
       <h1>Like you, be strong, to hold the powers of the sun</h1>
 
       {/* Posts */}
+      <div className="app_posts">
+        <div className="app_posts_left">
+          {posts.map(({ id, post }) => (
+            <Post
+              key={id}
+              postId={id}
+              user={user}
+              username={post.username}
+              caption={post.caption}
+              imageUrl={post.imageUrl}
+            />
+          ))}
+        </div>
+        <div className="app_posts_right">
+          <InstagramEmbed
+            url="https://www.instagram.com/p/B_uf9dmAGPw/"
+            maxWidth={320}
+            hideCaption={false}
+            containerTagName="div"
+            protocol=""
+            injectScript
+            onLoading={() => {}}
+            onSuccess={() => {}}
+            onAfterRender={() => {}}
+            onFailure={() => {}}
+          />
+        </div>
+      </div>
 
-      {posts.map(({ id, post }) => (
-        <Post
-          key={id}
-          username={post.username}
-          caption={post.caption}
-          imageUrl={post.imageUrl}
-        />
-      ))}
+      {user?.displayName ? (
+        <ImageUpload username={user.displayName} />
+      ) : (
+        <h3>You need to login to upload the post</h3>
+      )}
     </div>
   );
 }
